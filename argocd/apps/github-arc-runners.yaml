@@ -1,0 +1,124 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: github-arc-runners
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"  # Deploy after controller
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/YOUR_ORG/infra-backyard.git  # Update with your repo URL
+    targetRevision: main
+    path: charts/github-arc-runners
+    helm:
+      releaseName: arc-runners
+      values: |
+        # GitHub App configuration
+        github:
+          auth:
+            appID: "YOUR_APP_ID"  # Set via --set or update here
+            installationID: "YOUR_INSTALLATION_ID"  # Set via --set or update here
+            privateKey:
+              secretName: "github-app-credentials"
+              secretKey: "private-key"
+
+          # Scope - choose one and update
+          scope:
+            organization: "YOUR_ORGANIZATION"  # e.g., "my-org"
+            # repository: "YOUR_ORG/YOUR_REPO"  # Alternative to organization
+            # enterprise: "YOUR_ENTERPRISE"  # Alternative to organization/repository
+
+          runnerGroup: "Default"
+
+        # Runner scale set configuration
+        runnerScaleSet:
+          name: "arc-runners"
+          namespace: "github-runners"
+          minRunners: 0
+          maxRunners: 10
+
+          labels:
+            - "self-hosted"
+            - "linux"
+            - "x64"
+            - "kubernetes"
+
+          template:
+            spec:
+              containers:
+                - name: runner
+                  image: ghcr.io/actions/actions-runner:latest
+                  imagePullPolicy: IfNotPresent
+                  command: ["/home/runner/run.sh"]
+                  env:
+                    - name: RUNNER_FEATURE_FLAG_EPHEMERAL
+                      value: "true"
+                  resources:
+                    requests:
+                      cpu: "500m"
+                      memory: "512Mi"
+                    limits:
+                      cpu: "2000m"
+                      memory: "2Gi"
+                  volumeMounts:
+                    - name: work
+                      mountPath: /home/runner/_work
+
+              securityContext:
+                runAsUser: 1001
+                runAsGroup: 121
+                fsGroup: 121
+
+              volumes:
+                - name: work
+                  emptyDir: {}
+
+        # Listener configuration
+        listener:
+          image:
+            repository: ghcr.io/actions/gha-runner-scale-set-listener
+            tag: "0.9.3"
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+
+        # Controller service account
+        controllerServiceAccount:
+          name: "arc-controller-sa"
+          namespace: "arc-system"
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: github-runners
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  # Ignore differences in auto-generated fields
+  ignoreDifferences:
+    - group: actions.github.com
+      kind: AutoscalingRunnerSet
+      jsonPointers:
+        - /status

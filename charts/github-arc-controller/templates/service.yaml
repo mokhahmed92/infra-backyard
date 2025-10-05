@@ -1,0 +1,45 @@
+{{- if .Values.metricsService.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "github-arc-controller.fullname" . }}-metrics
+  labels:
+    app.kubernetes.io/name: {{ include "github-arc-controller.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: metrics
+  {{- with .Values.metricsService.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.metricsService.type }}
+  ports:
+    - port: {{ .Values.metricsService.port }}
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+  selector:
+    app.kubernetes.io/name: {{ include "github-arc-controller.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
+---
+{{- if .Values.webhookService.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "github-arc-controller.fullname" . }}-webhook
+  labels:
+    app.kubernetes.io/name: {{ include "github-arc-controller.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: webhook
+spec:
+  type: {{ .Values.webhookService.type }}
+  ports:
+    - port: {{ .Values.webhookService.port }}
+      targetPort: webhook
+      protocol: TCP
+      name: webhook
+  selector:
+    app.kubernetes.io/name: {{ include "github-arc-controller.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}

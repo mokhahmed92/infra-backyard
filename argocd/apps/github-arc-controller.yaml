@@ -1,0 +1,67 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: github-arc-controller
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/YOUR_ORG/infra-backyard.git  # Update with your repo URL
+    targetRevision: main
+    path: charts/github-arc-controller
+    helm:
+      releaseName: arc-controller
+      values: |
+        # Override values here if needed
+        replicaCount: 1
+
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+
+        controller:
+          logLevel: info
+          logFormat: json
+          watchNamespace: ""  # Watch all namespaces
+
+        metricsService:
+          enabled: true
+          annotations:
+            prometheus.io/scrape: "true"
+            prometheus.io/port: "8080"
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: arc-system
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  # Health check configuration
+  ignoreDifferences:
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      jqPathExpressions:
+        - .webhooks[].clientConfig.caBundle

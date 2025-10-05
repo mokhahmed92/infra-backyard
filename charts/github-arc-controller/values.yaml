@@ -1,0 +1,72 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/actions/gha-runner-scale-set-controller
+  pullPolicy: IfNotPresent
+  tag: "0.9.3"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: "arc-controller"
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: "arc-controller-sa"
+
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Controller configuration
+controller:
+  logLevel: info
+  logFormat: json
+  watchNamespace: ""  # Empty means all namespaces
+  metrics:
+    enabled: true
+    port: 8080
+  webhook:
+    enabled: true
+    port: 9443
+
+# Service configuration for metrics
+metricsService:
+  enabled: true
+  type: ClusterIP
+  port: 8080
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+
+# Service configuration for webhook
+webhookService:
+  enabled: true
+  type: ClusterIP
+  port: 9443

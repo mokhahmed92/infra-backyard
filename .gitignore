@@ -1,0 +1,49 @@
+# Secrets - never commit real credentials
+secrets/*-secret.yaml
+!secrets/*-example.yaml
+!secrets/*-template.yaml
+!secrets/README.md
+
+# Private keys
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Helm
+*.tgz
+charts/**/charts/
+charts/**/Chart.lock
+
+# Terraform (if added later)
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Local values
+*-local.yaml
+values-local.yaml
+
+# ArgoCD local config
+argocd-local/
+
+.claude/ 

@@ -1,0 +1,104 @@
+apiVersion: actions.github.com/v1alpha1
+kind: AutoscalingRunnerSet
+metadata:
+  name: {{ .Values.runnerScaleSet.name }}
+  namespace: {{ .Values.runnerScaleSet.namespace }}
+  labels:
+    {{- include "github-arc-runners.labels" . | nindent 4 }}
+spec:
+  githubConfigUrl: {{ required "GitHub scope (organization, repository, or enterprise) is required" (or .Values.github.scope.organization .Values.github.scope.repository .Values.github.scope.enterprise) | quote }}
+
+  githubConfigSecret: {{ .Values.github.auth.privateKey.secretName }}
+
+  {{- if .Values.github.runnerGroup }}
+  runnerGroup: {{ .Values.github.runnerGroup | quote }}
+  {{- end }}
+
+  minRunners: {{ .Values.runnerScaleSet.minRunners }}
+  maxRunners: {{ .Values.runnerScaleSet.maxRunners }}
+
+  runnerScaleSetName: {{ .Values.runnerScaleSet.name }}
+
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "github-arc-runners.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ .Values.runnerServiceAccount.name }}
+      {{- if .Values.runnerScaleSet.template.spec.securityContext }}
+      securityContext:
+        {{- toYaml .Values.runnerScaleSet.template.spec.securityContext | nindent 8 }}
+      {{- end }}
+      containers:
+        {{- toYaml .Values.runnerScaleSet.template.spec.containers | nindent 8 }}
+      {{- if .Values.runnerScaleSet.template.spec.volumes }}
+      volumes:
+        {{- toYaml .Values.runnerScaleSet.template.spec.volumes | nindent 8 }}
+      {{- end }}
+      {{- with .Values.runnerScaleSet.template.spec.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.runnerScaleSet.template.spec.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.runnerScaleSet.template.spec.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+  listenerTemplate:
+    metadata:
+      labels:
+        {{- include "github-arc-runners.labels" . | nindent 8 }}
+        app.kubernetes.io/component: listener
+    spec:
+      serviceAccountName: {{ .Values.controllerServiceAccount.name }}
+      containers:
+        - name: listener
+          image: "{{ .Values.listener.image.repository }}:{{ .Values.listener.image.tag }}"
+          imagePullPolicy: {{ .Values.listener.image.pullPolicy }}
+          {{- if .Values.listener.securityContext }}
+          securityContext:
+            {{- toYaml .Values.listener.securityContext | nindent 12 }}
+          {{- end }}
+          env:
+            - name: GITHUB_CONFIGURE_URL
+              value: {{ or .Values.github.scope.organization .Values.github.scope.repository .Values.github.scope.enterprise | quote }}
+            - name: GITHUB_APP_ID
+              value: {{ .Values.github.auth.appID | quote }}
+            - name: GITHUB_APP_INSTALLATION_ID
+              value: {{ .Values.github.auth.installationID | quote }}
+            - name: GITHUB_APP_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.github.auth.privateKey.secretName }}
+                  key: {{ .Values.github.auth.privateKey.secretKey }}
+            {{- if .Values.proxy.http.url }}
+            - name: http_proxy
+              value: {{ .Values.proxy.http.url | quote }}
+            {{- end }}
+            {{- if .Values.proxy.https.url }}
+            - name: https_proxy
+              value: {{ .Values.proxy.https.url | quote }}
+            {{- end }}
+            {{- if .Values.proxy.noProxy }}
+            - name: no_proxy
+              value: {{ join "," .Values.proxy.noProxy | quote }}
+            {{- end }}
+            {{- with .Values.env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.listener.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

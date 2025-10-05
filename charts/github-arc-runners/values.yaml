@@ -1,0 +1,139 @@
+# GitHub configuration
+github:
+  # GitHub App authentication
+  auth:
+    # GitHub App ID
+    appID: ""  # Set this value or use --set
+    # GitHub App Installation ID
+    installationID: ""  # Set this value or use --set
+    # Secret containing GitHub App private key
+    privateKey:
+      secretName: "github-app-credentials"
+      secretKey: "private-key"
+
+  # Scope configuration - choose one
+  scope:
+    # For organization-level runners
+    organization: ""  # e.g., "my-org"
+    # For repository-level runners (alternative to organization)
+    repository: ""  # e.g., "my-org/my-repo"
+    # For enterprise-level runners (alternative to organization/repository)
+    enterprise: ""  # e.g., "my-enterprise"
+
+  # Runner group (optional, defaults to "Default")
+  runnerGroup: "Default"
+
+# Runner scale set configuration
+runnerScaleSet:
+  # Name of the runner scale set
+  name: "arc-runners"
+
+  # Namespace where runners will be created
+  namespace: "github-runners"
+
+  # Minimum number of idle runners
+  minRunners: 0
+
+  # Maximum number of runners
+  maxRunners: 10
+
+  # Runner labels (used for workflow job targeting)
+  labels:
+    - "self-hosted"
+    - "linux"
+    - "x64"
+
+  # Runner pod template
+  template:
+    spec:
+      containers:
+        - name: runner
+          image: ghcr.io/actions/actions-runner:latest
+          imagePullPolicy: IfNotPresent
+          command: ["/home/runner/run.sh"]
+          env:
+            - name: RUNNER_FEATURE_FLAG_EPHEMERAL
+              value: "true"
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "2000m"
+              memory: "2Gi"
+          volumeMounts:
+            - name: work
+              mountPath: /home/runner/_work
+
+      # Security context
+      securityContext:
+        runAsUser: 1001
+        runAsGroup: 121
+        fsGroup: 121
+
+      # Volumes
+      volumes:
+        - name: work
+          emptyDir: {}
+
+      # Node selector
+      nodeSelector: {}
+
+      # Tolerations
+      tolerations: []
+
+      # Affinity
+      affinity: {}
+
+# Controller service account to use
+controllerServiceAccount:
+  name: "arc-controller-sa"
+  namespace: "arc-system"
+
+# Listener configuration (manages scaling)
+listener:
+  image:
+    repository: ghcr.io/actions/gha-runner-scale-set-listener
+    tag: "0.9.3"
+    pullPolicy: IfNotPresent
+
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: true
+
+# Proxy configuration (optional)
+proxy:
+  http:
+    url: ""
+    credentialSecretRef: ""
+  https:
+    url: ""
+    credentialSecretRef: ""
+  noProxy: []
+
+# Additional environment variables for runners
+env: []
+  # - name: MY_VAR
+  #   value: "my-value"
+
+# Pod annotations
+podAnnotations: {}
+
+# Service account for runners
+runnerServiceAccount:
+  create: true
+  annotations: {}
+  name: "arc-runner-sa"
